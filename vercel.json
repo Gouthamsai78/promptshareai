@@ -12,7 +12,7 @@
       "destination": "/api/:match*"
     },
     {
-      "source": "/:all*",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ],
