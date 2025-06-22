@@ -1,12 +1,47 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Mail, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Mail, RefreshCw, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 const VerifyEmail: React.FC = () => {
   const [isResending, setIsResending] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
+  const [isVerified, setIsVerified] = useState(false);
+  const [verificationError, setVerificationError] = useState('');
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    // Check if this is a verification callback
+    const token = searchParams.get('token');
+    const type = searchParams.get('type');
+
+    if (token && type === 'signup') {
+      handleEmailVerification(token);
+    }
+  }, [searchParams]);
+
+  const handleEmailVerification = async (token: string) => {
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        token_hash: token,
+        type: 'signup'
+      });
+
+      if (error) {
+        setVerificationError('Invalid or expired verification link. Please request a new one.');
+      } else {
+        setIsVerified(true);
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 3000);
+      }
+    } catch (error) {
+      setVerificationError('Failed to verify email. Please try again.');
+    }
+  };
 
   const handleResendEmail = async () => {
     if (!user?.email) return;

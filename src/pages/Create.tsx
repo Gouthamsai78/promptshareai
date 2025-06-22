@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Upload, Image, Video, X, Plus, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
-import FileUpload from '../components/FileUpload';
+import SmartFileUpload from '../components/SmartFileUpload';
 
 const Create: React.FC = () => {
   const { user } = useAuth();
@@ -21,6 +21,7 @@ const Create: React.FC = () => {
 
   const [currentTag, setCurrentTag] = useState('');
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -56,6 +57,18 @@ const Create: React.FC = () => {
 
   const handleUploadError = (error: string) => {
     setError(error);
+  };
+
+  const handleSmartFileUpload = (files: File[], mediaType: 'image' | 'video' | 'carousel') => {
+    setUploadedFiles(files);
+    setFormData(prev => ({ ...prev, mediaType }));
+    setError('');
+
+    // For now, we'll create mock URLs. In a real app, you'd upload to Supabase Storage
+    const mockUrls = files.map((file, index) =>
+      `https://example.com/uploads/${Date.now()}-${index}-${file.name}`
+    );
+    setMediaUrls(mockUrls);
   };
 
   const validateForm = () => {
@@ -121,6 +134,7 @@ const Create: React.FC = () => {
         status: 'published'
       });
       setMediaUrls([]);
+      setUploadedFiles([]);
       setCurrentTag('');
 
       // Redirect to home after a short delay
@@ -176,6 +190,18 @@ const Create: React.FC = () => {
             <p className="text-red-700 dark:text-red-400">{error}</p>
           </div>
         )}
+
+        {/* Smart File Upload - Prominent at the top */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            📁 Upload Your Content
+          </h3>
+          <SmartFileUpload
+            onFilesSelected={handleSmartFileUpload}
+            maxFiles={10}
+            maxSizeInMB={50}
+          />
+        </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -243,68 +269,31 @@ const Create: React.FC = () => {
             </div>
           </div>
 
-          {/* Media Upload */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Media (Optional)
-            </h3>
-
-            {/* Media Type Selection */}
-            <div className="flex space-x-4 mb-4">
-              <button
-                type="button"
-                onClick={() => handleInputChange('mediaType', 'image')}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
-                  formData.mediaType === 'image'
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
-                    : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Image size={18} />
-                <span>Image</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleInputChange('mediaType', 'carousel')}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
-                  formData.mediaType === 'carousel'
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
-                    : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Plus size={18} />
-                <span>Carousel</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleInputChange('mediaType', 'video')}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
-                  formData.mediaType === 'video'
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
-                    : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Video size={18} />
-                <span>Video</span>
-              </button>
+          {/* Media Summary */}
+          {uploadedFiles.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                📎 Uploaded Content
+              </h3>
+              <div className="flex items-center space-x-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div className="flex-shrink-0">
+                  {formData.mediaType === 'video' && <Video className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+                  {formData.mediaType === 'image' && <Image className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+                  {formData.mediaType === 'carousel' && <Plus className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    {formData.mediaType === 'video' && 'Video Post'}
+                    {formData.mediaType === 'image' && 'Image Post'}
+                    {formData.mediaType === 'carousel' && 'Carousel Post'}
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    {uploadedFiles.length} file{uploadedFiles.length > 1 ? 's' : ''} uploaded
+                  </p>
+                </div>
+              </div>
             </div>
-
-            {/* File Upload Component */}
-            <FileUpload
-              onFilesUploaded={handleMediaUpload}
-              onError={handleUploadError}
-              acceptedTypes={
-                formData.mediaType === 'video'
-                  ? ['video/mp4', 'video/webm', 'video/quicktime']
-                  : ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-              }
-              maxFiles={formData.mediaType === 'carousel' ? 10 : 1}
-              maxSizeInMB={formData.mediaType === 'video' ? 100 : 10}
-              bucket="media"
-            />
-          </div>
+          )}
 
           {/* Tags and Settings */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700">

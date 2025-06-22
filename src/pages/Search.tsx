@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Search as SearchIcon, Filter, X, Sliders } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search as SearchIcon, Filter, X, Sliders, Loader } from 'lucide-react';
 import PostCard from '../components/PostCard';
 import ToolCard from '../components/ToolCard';
-import { mockPosts, mockTools } from '../data/mockData';
+import { DatabaseService } from '../services/database';
+import { Post, Tool } from '../types';
 
 const Search: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -10,11 +11,38 @@ const Search: React.FC = () => {
   const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'most_copied'>('newest');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [tools, setTools] = useState<Tool[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Load initial data
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [postsData, toolsData] = await Promise.all([
+        DatabaseService.getPosts(50, 0),
+        DatabaseService.getTools(50, 0)
+      ]);
+      setPosts(postsData);
+      setTools(toolsData);
+    } catch (error: any) {
+      console.error('Error loading search data:', error);
+      setError('Failed to load data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Get all unique tags
   const allTags = Array.from(new Set([
-    ...mockPosts.flatMap(post => post.tags),
-    ...mockTools.flatMap(tool => tool.tags)
+    ...posts.flatMap(post => post.tags || []),
+    ...tools.flatMap(tool => tool.category ? [tool.category] : [])
   ]));
 
   const toggleTag = (tag: string) => {
@@ -31,28 +59,27 @@ const Search: React.FC = () => {
   };
 
   // Filter and search logic
-  const filteredPosts = mockPosts.filter(post => {
-    const matchesSearch = searchTerm === '' || 
-      post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      post.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredPosts = posts.filter(post => {
+    const matchesSearch = searchTerm === '' ||
+      post.content?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       post.prompt?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      post.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesTags = selectedTags.length === 0 || 
-      selectedTags.some(tag => post.tags.includes(tag));
-    
+      (post.tags && post.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())));
+
+    const matchesTags = selectedTags.length === 0 ||
+      (post.tags && selectedTags.some(tag => post.tags?.includes(tag)));
+
     return matchesSearch && matchesTags;
   });
 
-  const filteredTools = mockTools.filter(tool => {
+  const filteredTools = tools.filter(tool => {
     const matchesSearch = searchTerm === '' ||
       tool.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tool.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tool.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    
+      tool.category?.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesTags = selectedTags.length === 0 ||
-      selectedTags.some(tag => tool.tags.includes(tag));
-    
+      (tool.category && selectedTags.includes(tool.category));
+
     return matchesSearch && matchesTags;
   });
 
@@ -69,6 +96,19 @@ const Search: React.FC = () => {
           </p>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-red-700 dark:text-red-400">{error}</p>
+            <button
+              onClick={loadData}
+              className="mt-2 text-sm text-red-600 hover:text-red-700 dark:text-red-400 underline"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
         {/* Search Bar */}
         <div className="relative mb-6">
           <SearchIcon className="absolute left-4 top-3.5 h-5 w-5 text-gray-400" />
@@ -78,6 +118,7 @@ const Search: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search for prompts, tools, or tags..."
             className="w-full px-4 py-3 pl-12 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white text-lg"
+            disabled={loading}
           />
           <button
             onClick={() => setShowFilters(!showFilters)}
@@ -86,6 +127,7 @@ const Search: React.FC = () => {
                 ? 'text-blue-500'
                 : 'text-gray-400 hover:text-gray-600'
             }`}
+            disabled={loading}
           >
             <Sliders size={20} />
           </button>
@@ -205,8 +247,19 @@ const Search: React.FC = () => {
           </div>
         )}
 
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="flex items-center space-x-3">
+              <Loader className="w-6 h-6 animate-spin text-blue-500" />
+              <span className="text-gray-600 dark:text-gray-400">Loading search data...</span>
+            </div>
+          </div>
+        )}
+
         {/* Results */}
-        <div className="space-y-8">
+        {!loading && (
+          <div className="space-y-8">
           {/* Prompts Section */}
           {(searchType === 'all' || searchType === 'prompts') && filteredPosts.length > 0 && (
             <div>
@@ -264,7 +317,8 @@ const Search: React.FC = () => {
               </p>
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

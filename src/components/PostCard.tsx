@@ -3,6 +3,7 @@ import { Heart, MessageCircle, Bookmark, Copy, Check, ChevronLeft, ChevronRight 
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 import { Post } from '../types';
+import Comments from './Comments';
 
 interface PostCardProps {
   post: Post;
@@ -16,6 +17,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const [copied, setCopied] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showComments, setShowComments] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -256,7 +258,10 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             <span className="text-sm font-medium">{likesCount}</span>
           </button>
 
-          <button className="flex items-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-blue-500 transition-colors">
+          <button
+            onClick={() => setShowComments(!showComments)}
+            className="flex items-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-blue-500 transition-colors"
+          >
             <MessageCircle size={20} />
             <span className="text-sm font-medium">{post.comments_count}</span>
           </button>
@@ -272,6 +277,13 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           <Bookmark size={20} fill={isSaved ? 'currentColor' : 'none'} />
         </button>
       </div>
+
+      {/* Comments Section */}
+      {showComments && (
+        <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+          <Comments postId={post.id} />
+        </div>
+      )}
     </div>
   );
 };

@@ -21,30 +21,112 @@ export class AuthService {
 
   // Sign in with email and password
   static async signInWithEmail(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    // Quick validation to avoid unnecessary API calls
+    if (!email || !password) {
+      throw new Error('Email and password are required');
+    }
 
-    if (error) throw error;
-    return data;
+    if (!email.includes('@')) {
+      throw new Error('Please enter a valid email address');
+    }
+
+    if (password.length < 6) {
+      throw new Error('Password must be at least 6 characters');
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        // Provide user-friendly error messages
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid email or password. Please check your credentials and try again.');
+        }
+        if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please check your email and click the confirmation link before signing in.');
+        }
+        if (error.message.includes('Too many requests')) {
+          throw new Error('Too many login attempts. Please wait a moment and try again.');
+        }
+        throw new Error(error.message);
+      }
+
+      return data;
+    } catch (error: any) {
+      // Handle network errors
+      if (error.message.includes('Failed to fetch')) {
+        throw new Error('Network error. Please check your internet connection and try again.');
+      }
+      throw error;
+    }
   }
 
   // Sign up with email and password
   static async signUpWithEmail(email: string, password: string, username: string, fullName?: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          username,
-          full_name: fullName,
-        },
-      },
-    });
+    // Quick validation to avoid unnecessary API calls
+    if (!email || !password || !username) {
+      throw new Error('Email, password, and username are required');
+    }
 
-    if (error) throw error;
-    return data;
+    if (!email.includes('@')) {
+      throw new Error('Please enter a valid email address');
+    }
+
+    if (password.length < 6) {
+      throw new Error('Password must be at least 6 characters');
+    }
+
+    if (username.length < 3) {
+      throw new Error('Username must be at least 3 characters');
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      throw new Error('Username can only contain letters, numbers, and underscores');
+    }
+
+    try {
+      // Check if username is available
+      const isAvailable = await this.isUsernameAvailable(username);
+      if (!isAvailable) {
+        throw new Error('Username is already taken. Please choose a different one.');
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username,
+            full_name: fullName || username,
+          },
+        },
+      });
+
+      if (error) {
+        // Provide user-friendly error messages
+        if (error.message.includes('User already registered')) {
+          throw new Error('An account with this email already exists. Please sign in instead.');
+        }
+        if (error.message.includes('Password should be at least')) {
+          throw new Error('Password must be at least 6 characters long');
+        }
+        if (error.message.includes('Unable to validate email address')) {
+          throw new Error('Please enter a valid email address');
+        }
+        throw new Error(error.message);
+      }
+
+      return data;
+    } catch (error: any) {
+      // Handle network errors
+      if (error.message.includes('Failed to fetch')) {
+        throw new Error('Network error. Please check your internet connection and try again.');
+      }
+      throw error;
+    }
   }
 
   // Sign out

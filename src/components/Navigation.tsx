@@ -1,19 +1,25 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Video, Plus, Search, User, Moon, Sun, Compass } from 'lucide-react';
+import { Home, Video, Plus, Search, User, Moon, Sun, Compass, Settings } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 
 const Navigation: React.FC = () => {
   const location = useLocation();
   const { isDark, toggleTheme } = useTheme();
 
-  const navItems = [
+  const desktopNavItems = [
     { path: '/', icon: Home, label: 'Home' },
     { path: '/reels', icon: Video, label: 'Reels' },
     { path: '/create', icon: Plus, label: 'Create' },
-    { path: '/explore', icon: Compass, label: 'Explore' },
+    { path: '/explore', icon: Compass, label: 'Explore' }
+  ];
+
+  const mobileNavItems = [
+    { path: '/', icon: Home, label: 'Home' },
     { path: '/search', icon: Search, label: 'Search' },
-    { path: '/profile', icon: User, label: 'Profile' }
+    { path: '/create', icon: Plus, label: 'Create' },
+    { path: '/reels', icon: Video, label: 'Reels' },
+    { path: '/settings', icon: Settings, label: 'Settings' }
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -31,7 +37,7 @@ const Navigation: React.FC = () => {
           </Link>
 
           <div className="flex items-center space-x-8">
-            {navItems.slice(0, 4).map(({ path, icon: Icon, label }) => (
+            {desktopNavItems.map(({ path, icon: Icon, label }) => (
               <Link
                 key={path}
                 to={path}
@@ -83,17 +89,17 @@ const Navigation: React.FC = () => {
       {/* Mobile Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-around px-2 py-3">
-          {navItems.map(({ path, icon: Icon, label }) => (
+          {mobileNavItems.map(({ path, icon: Icon, label }) => (
             <Link
               key={path}
               to={path}
-              className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-all duration-200 ${
+              className={`flex flex-col items-center space-y-1 px-2 py-2 rounded-lg transition-all duration-200 ${
                 isActive(path)
                   ? 'text-blue-600 dark:text-blue-400'
                   : 'text-gray-600 dark:text-gray-400'
               }`}
             >
-              <Icon size={path === '/create' ? 28 : 24} strokeWidth={path === '/create' ? 2.5 : 2} />
+              <Icon size={path === '/create' ? 28 : 22} strokeWidth={path === '/create' ? 2.5 : 2} />
               <span className="text-xs font-medium">{label}</span>
             </Link>
           ))}
