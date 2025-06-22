@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, Bookmark, Copy, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
@@ -11,6 +12,7 @@ interface PostCardProps {
 
 const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likes_count);
@@ -110,16 +112,24 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       {/* Header */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <img
-            src={post.author.avatar_url || `https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100`}
-            alt={post.author.username}
-            className="w-10 h-10 rounded-full object-cover"
-          />
+          <button
+            onClick={() => navigate(`/user/${post.author.username}`)}
+            className="flex-shrink-0 hover:opacity-80 transition-opacity"
+          >
+            <img
+              src={post.author.avatar_url || `https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100`}
+              alt={post.author.username}
+              className="w-10 h-10 rounded-full object-cover"
+            />
+          </button>
           <div>
             <div className="flex items-center space-x-1">
-              <h3 className="font-semibold text-gray-900 dark:text-white">
+              <button
+                onClick={() => navigate(`/user/${post.author.username}`)}
+                className="font-semibold text-gray-900 dark:text-white hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+              >
                 {post.author.full_name || post.author.username}
-              </h3>
+              </button>
               {post.author.verified && (
                 <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
                   <Check size={10} className="text-white" />
@@ -127,7 +137,13 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               )}
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              @{post.author.username} • {new Date(post.created_at).toLocaleDateString()}
+              <button
+                onClick={() => navigate(`/user/${post.author.username}`)}
+                className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+              >
+                @{post.author.username}
+              </button>
+              <span> • {new Date(post.created_at).toLocaleDateString()}</span>
             </p>
           </div>
         </div>

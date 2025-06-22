@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Search as SearchIcon, Filter, X, Sliders, Loader } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search as SearchIcon, Filter, X, Sliders, Loader, User, Users } from 'lucide-react';
 import PostCard from '../components/PostCard';
 import ToolCard from '../components/ToolCard';
 import { DatabaseService } from '../services/database';
-import { Post, Tool } from '../types';
+import { Post, Tool, Profile } from '../types';
 import PageLayout from '../components/PageLayout';
 
 const Search: React.FC = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchType, setSearchType] = useState<'all' | 'prompts' | 'tools'>('all');
+  const [searchType, setSearchType] = useState<'all' | 'prompts' | 'tools' | 'users'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'most_copied'>('newest');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [tools, setTools] = useState<Tool[]>([]);
+  const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -39,6 +42,34 @@ const Search: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Search function for users
+  const searchUsers = async (query: string) => {
+    if (!query.trim()) {
+      setUsers([]);
+      return;
+    }
+
+    try {
+      const usersData = await DatabaseService.searchUsers(query, 20);
+      setUsers(usersData);
+    } catch (error: any) {
+      console.error('Error searching users:', error);
+    }
+  };
+
+  // Debounced search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm.trim() && (searchType === 'all' || searchType === 'users')) {
+        searchUsers(searchTerm);
+      } else {
+        setUsers([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, searchType]);
 
   // Get all unique tags
   const allTags = Array.from(new Set([
@@ -139,7 +170,8 @@ const Search: React.FC = () => {
           {[
             { key: 'all', label: 'All' },
             { key: 'prompts', label: 'Prompts' },
-            { key: 'tools', label: 'Tools' }
+            { key: 'tools', label: 'Tools' },
+            { key: 'users', label: 'Users' }
           ].map(({ key, label }) => (
             <button
               key={key}
@@ -289,8 +321,58 @@ const Search: React.FC = () => {
             </div>
           )}
 
+          {/* Users Section */}
+          {(searchType === 'all' || searchType === 'users') && users.length > 0 && (
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                Users ({users.length})
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {users.map(user => (
+                  <div
+                    key={user.id}
+                    onClick={() => navigate(`/user/${user.username}`)}
+                    className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <img
+                        src={user.avatar_url || `https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100`}
+                        alt={user.username}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-1">
+                          <h3 className="font-semibold text-gray-900 dark:text-white">
+                            {user.full_name || user.username}
+                          </h3>
+                          {user.verified && (
+                            <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs">✓</span>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          @{user.username}
+                        </p>
+                        {user.bio && (
+                          <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                            {user.bio}
+                          </p>
+                        )}
+                        <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                          <span>{user.posts_count || 0} posts</span>
+                          <span>{user.followers_count} followers</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Empty State */}
-          {filteredPosts.length === 0 && filteredTools.length === 0 && searchTerm && (
+          {filteredPosts.length === 0 && filteredTools.length === 0 && users.length === 0 && searchTerm && (
             <div className="text-center py-12">
               <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                 <SearchIcon size={32} className="text-gray-400" />
@@ -314,7 +396,7 @@ const Search: React.FC = () => {
                 Start searching
               </h3>
               <p className="text-gray-600 dark:text-gray-400">
-                Enter keywords to find prompts and tools
+                Enter keywords to find prompts, tools, and users
               </p>
             </div>
           )}

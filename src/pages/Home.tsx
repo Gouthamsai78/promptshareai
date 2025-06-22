@@ -1,23 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
-import { Post } from '../types';
+import { Post, Reel } from '../types';
 import PostCard from '../components/PostCard';
+import ReelCard from '../components/ReelCard';
 import PageLayout from '../components/PageLayout';
 
+type FeedItem = (Post & { type: 'post' }) | (Reel & { type: 'reel' });
+
 const Home: React.FC = () => {
-  const { user } = useAuth();
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadPosts();
+    loadFeedItems();
   }, []);
 
-  const loadPosts = async (offset = 0) => {
+  const loadFeedItems = async (offset = 0) => {
     try {
       if (offset === 0) {
         setLoading(true);
@@ -25,23 +26,36 @@ const Home: React.FC = () => {
         setLoadingMore(true);
       }
 
-      const newPosts = await DatabaseService.getPosts(20, offset);
+      // Load both posts and reels
+      const [posts, reels] = await Promise.all([
+        DatabaseService.getPosts(15, Math.floor(offset * 0.75)), // 75% posts
+        DatabaseService.getReels(5, Math.floor(offset * 0.25))   // 25% reels
+      ]);
+
+      // Combine and shuffle posts and reels
+      const combinedItems: FeedItem[] = [
+        ...posts.map(post => ({ ...post, type: 'post' as const })),
+        ...reels.map(reel => ({ ...reel, type: 'reel' as const }))
+      ];
+
+      // Sort by creation date for chronological feed
+      combinedItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       if (offset === 0) {
-        setPosts(newPosts);
+        setFeedItems(combinedItems);
       } else {
-        setPosts(prev => [...prev, ...newPosts]);
+        setFeedItems(prev => [...prev, ...combinedItems]);
       }
 
-      // Check if there are more posts
-      if (newPosts.length < 20) {
+      // Check if there are more items
+      if (combinedItems.length < 20) {
         setHasMore(false);
       }
 
       setError('');
     } catch (error: any) {
-      console.error('Error loading posts:', error);
-      setError('Failed to load posts. Please try again.');
+      console.error('Error loading feed items:', error);
+      setError('Failed to load feed. Please try again.');
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -50,7 +64,7 @@ const Home: React.FC = () => {
 
   const handleLoadMore = () => {
     if (!loadingMore && hasMore) {
-      loadPosts(posts.length);
+      loadFeedItems(feedItems.length);
     }
   };
 
@@ -68,10 +82,10 @@ const Home: React.FC = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Latest Prompts
+            Latest Content
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Discover and share amazing AI prompts from the community
+            Discover amazing AI prompts, reels, and tools from the community
           </p>
         </div>
 
@@ -80,7 +94,7 @@ const Home: React.FC = () => {
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
             <p className="text-red-700 dark:text-red-400">{error}</p>
             <button
-              onClick={() => loadPosts()}
+              onClick={() => loadFeedItems()}
               className="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 underline"
             >
               Try again
@@ -88,24 +102,32 @@ const Home: React.FC = () => {
           </div>
         )}
 
-        {/* Posts Feed */}
-        <div className="space-y-6">
-          {posts.map((post) => (
-            <PostCard key={post.id} post={post} />
-          ))}
-        </div>
+        {/* Feed Items */}
+        {feedItems.length > 0 && (
+          <div className="space-y-6">
+            {feedItems.map(item => (
+              item.type === 'post' ? (
+                <PostCard key={`post-${item.id}`} post={item} />
+              ) : (
+                <div key={`reel-${item.id}`} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+                  <ReelCard reel={item} isVisible={false} isInFeed={true} />
+                </div>
+              )
+            ))}
+          </div>
+        )}
 
         {/* Empty State */}
-        {posts.length === 0 && !loading && !error && (
+        {feedItems.length === 0 && !loading && !error && (
           <div className="text-center py-12">
             <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-4xl">📝</span>
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              No posts yet
+              No content yet
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Be the first to share an amazing AI prompt!
+              Be the first to share amazing AI content!
             </p>
             <button
               onClick={() => window.location.href = '/create'}
@@ -117,14 +139,14 @@ const Home: React.FC = () => {
         )}
 
         {/* Load More */}
-        {posts.length > 0 && hasMore && (
+        {feedItems.length > 0 && hasMore && (
           <div className="mt-8 text-center">
             <button
               onClick={handleLoadMore}
               disabled={loadingMore}
               className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loadingMore ? 'Loading...' : 'Load More Posts'}
+              {loadingMore ? 'Loading...' : 'Load More Content'}
             </button>
           </div>
         )}

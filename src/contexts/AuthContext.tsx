@@ -317,9 +317,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = async () => {
     try {
+      console.log('🔄 Starting logout process...');
+
+      // Sign out from Supabase
       await AuthService.signOut();
+
+      // Clear local state immediately
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      setAuthError(null);
+
+      // Clear any cached data in localStorage
+      localStorage.removeItem('supabase.auth.token');
+      localStorage.removeItem('sb-dvipkkjmzcinqfvjntna-auth-token');
+
+      console.log('✅ Logout completed successfully');
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('❌ Error signing out:', error);
+
+      // Even if there's an error, clear local state
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      setAuthError(null);
+
       throw error;
     }
   };

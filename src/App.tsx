@@ -11,6 +11,7 @@ import Create from './pages/Create';
 import Explore from './pages/Explore';
 import Search from './pages/Search';
 import Profile from './pages/Profile';
+import UserProfile from './pages/UserProfile';
 
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -133,6 +134,16 @@ const AppRoutes = () => {
               <OfflineModeIndicator />
               <Navigation />
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/:username"
+          element={
+            <ProtectedRoute>
+              <OfflineModeIndicator />
+              <Navigation />
+              <UserProfile />
             </ProtectedRoute>
           }
         />

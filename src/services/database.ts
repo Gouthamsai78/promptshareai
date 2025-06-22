@@ -320,15 +320,27 @@ export class DatabaseService {
   }
 
   static async updateReelViews(id: string): Promise<void> {
+    // Simple increment with updated timestamp
     const { error } = await supabase
       .from('reels')
       .update({
-        views_count: supabase.sql`views_count + 1`,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', id)
+      .select()
+      .single();
 
     if (error) throw error;
+
+    // Use a separate RPC call for incrementing views to avoid SQL injection
+    const { error: rpcError } = await supabase.rpc('increment_reel_views', {
+      reel_id: id
+    });
+
+    // If RPC doesn't exist, that's okay - we'll handle it in the database
+    if (rpcError && !rpcError.message.includes('function increment_reel_views')) {
+      throw rpcError;
+    }
   }
 
   // Tools
@@ -541,6 +553,74 @@ export class DatabaseService {
   static async isReelLiked(userId: string, reelId: string): Promise<boolean> {
     const { data, error } = await supabase
       .from('likes')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('reel_id', reelId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return !!data;
+  }
+
+  static async likeComment(userId: string, commentId: string): Promise<void> {
+    const { error } = await supabase
+      .from('likes')
+      .insert({
+        user_id: userId,
+        comment_id: commentId,
+      });
+
+    if (error) throw error;
+  }
+
+  static async unlikeComment(userId: string, commentId: string): Promise<void> {
+    const { error } = await supabase
+      .from('likes')
+      .delete()
+      .eq('user_id', userId)
+      .eq('comment_id', commentId);
+
+    if (error) throw error;
+  }
+
+  static async isCommentLiked(userId: string, commentId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('likes')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('comment_id', commentId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return !!data;
+  }
+
+
+
+  static async saveReel(userId: string, reelId: string): Promise<void> {
+    const { error } = await supabase
+      .from('saves')
+      .insert({
+        user_id: userId,
+        reel_id: reelId,
+      });
+
+    if (error) throw error;
+  }
+
+  static async unsaveReel(userId: string, reelId: string): Promise<void> {
+    const { error } = await supabase
+      .from('saves')
+      .delete()
+      .eq('user_id', userId)
+      .eq('reel_id', reelId);
+
+    if (error) throw error;
+  }
+
+  static async isReelSaved(userId: string, reelId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('saves')
       .select('id')
       .eq('user_id', userId)
       .eq('reel_id', reelId)

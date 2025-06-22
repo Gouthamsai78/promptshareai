@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import ReelCard from '../components/ReelCard';
 import { DatabaseService } from '../services/database';
 import { Reel } from '../types';
 import { Loader } from 'lucide-react';
 
 const Reels: React.FC = () => {
+  const location = useLocation();
   const [currentReelIndex, setCurrentReelIndex] = useState(0);
   const [reels, setReels] = useState<Reel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,6 +16,24 @@ const Reels: React.FC = () => {
   useEffect(() => {
     loadReels();
   }, []);
+
+  useEffect(() => {
+    // Handle navigation from feed with specific reel
+    const state = location.state as { startReelId?: string };
+    if (state?.startReelId && reels.length > 0) {
+      const reelIndex = reels.findIndex(reel => reel.id === state.startReelId);
+      if (reelIndex !== -1) {
+        setCurrentReelIndex(reelIndex);
+        // Scroll to the specific reel
+        if (containerRef.current) {
+          containerRef.current.scrollTo({
+            top: reelIndex * window.innerHeight,
+            behavior: 'smooth'
+          });
+        }
+      }
+    }
+  }, [reels, location.state]);
 
   const loadReels = async () => {
     setLoading(true);

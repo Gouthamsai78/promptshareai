@@ -19,6 +19,8 @@ const Comments: React.FC<CommentsProps> = ({ postId, reelId, className = '' }) =
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
+  const [likingComments, setLikingComments] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (postId || reelId) {
@@ -32,6 +34,35 @@ const Comments: React.FC<CommentsProps> = ({ postId, reelId, className = '' }) =
     try {
       const commentsData = await DatabaseService.getComments(postId, reelId);
       setComments(commentsData);
+
+      // Check which comments are liked by the current user
+      if (user && commentsData.length > 0) {
+        const likedStatus = new Set<string>();
+        await Promise.all(
+          commentsData.map(async (comment) => {
+            try {
+              const isLiked = await DatabaseService.isCommentLiked(user.id, comment.id);
+              if (isLiked) {
+                likedStatus.add(comment.id);
+              }
+              // Check replies too
+              if (comment.replies) {
+                await Promise.all(
+                  comment.replies.map(async (reply) => {
+                    const isReplyLiked = await DatabaseService.isCommentLiked(user.id, reply.id);
+                    if (isReplyLiked) {
+                      likedStatus.add(reply.id);
+                    }
+                  })
+                );
+              }
+            } catch (error) {
+              console.error('Error checking comment like status:', error);
+            }
+          })
+        );
+        setLikedComments(likedStatus);
+      }
     } catch (error: any) {
       console.error('Error loading comments:', error);
       setError('Failed to load comments');
@@ -101,6 +132,71 @@ const Comments: React.FC<CommentsProps> = ({ postId, reelId, className = '' }) =
     }
   };
 
+  const handleLikeComment = async (commentId: string) => {
+    if (!user || likingComments.has(commentId)) return;
+
+    setLikingComments(prev => new Set(prev).add(commentId));
+
+    try {
+      const isCurrentlyLiked = likedComments.has(commentId);
+
+      if (isCurrentlyLiked) {
+        await DatabaseService.unlikeComment(user.id, commentId);
+        setLikedComments(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(commentId);
+          return newSet;
+        });
+        // Update local comment likes count
+        setComments(prev => prev.map(comment => {
+          if (comment.id === commentId) {
+            return { ...comment, likes_count: (comment.likes_count || 0) - 1 };
+          }
+          if (comment.replies) {
+            return {
+              ...comment,
+              replies: comment.replies.map(reply =>
+                reply.id === commentId
+                  ? { ...reply, likes_count: (reply.likes_count || 0) - 1 }
+                  : reply
+              )
+            };
+          }
+          return comment;
+        }));
+      } else {
+        await DatabaseService.likeComment(user.id, commentId);
+        setLikedComments(prev => new Set(prev).add(commentId));
+        // Update local comment likes count
+        setComments(prev => prev.map(comment => {
+          if (comment.id === commentId) {
+            return { ...comment, likes_count: (comment.likes_count || 0) + 1 };
+          }
+          if (comment.replies) {
+            return {
+              ...comment,
+              replies: comment.replies.map(reply =>
+                reply.id === commentId
+                  ? { ...reply, likes_count: (reply.likes_count || 0) + 1 }
+                  : reply
+              )
+            };
+          }
+          return comment;
+        }));
+      }
+    } catch (error: any) {
+      console.error('Error toggling comment like:', error);
+      setError('Failed to like comment');
+    } finally {
+      setLikingComments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(commentId);
+        return newSet;
+      });
+    }
+  };
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -146,8 +242,16 @@ const Comments: React.FC<CommentsProps> = ({ postId, reelId, className = '' }) =
           </p>
           
           <div className="mt-2 flex items-center space-x-4">
-            <button className="flex items-center space-x-1 text-xs text-gray-500 hover:text-red-500 transition-colors">
-              <Heart size={14} />
+            <button
+              onClick={() => handleLikeComment(comment.id)}
+              disabled={likingComments.has(comment.id)}
+              className={`flex items-center space-x-1 text-xs transition-colors disabled:opacity-50 ${
+                likedComments.has(comment.id)
+                  ? 'text-red-500'
+                  : 'text-gray-500 hover:text-red-500'
+              }`}
+            >
+              <Heart size={14} fill={likedComments.has(comment.id) ? 'currentColor' : 'none'} />
               <span>{comment.likes_count || 0}</span>
             </button>
             

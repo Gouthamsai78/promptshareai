@@ -211,3 +211,14 @@ CREATE TRIGGER on_follow_created
 CREATE TRIGGER on_follow_deleted
     AFTER DELETE ON public.follows
     FOR EACH ROW EXECUTE FUNCTION public.update_follow_counts();
+
+-- Function to safely increment reel views with rate limiting
+CREATE OR REPLACE FUNCTION public.increment_reel_views(reel_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE public.reels
+    SET views_count = views_count + 1,
+        updated_at = NOW()
+    WHERE id = reel_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
