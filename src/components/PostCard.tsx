@@ -149,45 +149,69 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       {post.media_urls && post.media_urls.length > 0 && (
         <div className="relative">
           {post.media_type === 'image' && (
-            <img
-              src={post.media_urls[0]}
-              alt={post.title}
-              className="w-full h-64 md:h-80 object-cover"
-            />
+            <div className="w-full max-w-full overflow-hidden bg-gray-100 dark:bg-gray-800">
+              <img
+                src={post.media_urls[0]}
+                alt={post.title}
+                className="w-full h-auto object-contain max-h-[80vh]"
+                style={{
+                  imageRendering: '-webkit-optimize-contrast' as any
+                }}
+                onError={(e) => {
+                  // Fallback to a placeholder image if the original fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.src = 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=800';
+                }}
+              />
+            </div>
           )}
 
           {post.media_type === 'video' && (
-            <video
-              src={post.media_urls[0]}
-              controls
-              className="w-full h-64 md:h-80 object-cover"
-            />
+            <div className="w-full max-w-full overflow-hidden bg-black">
+              <video
+                src={post.media_urls[0]}
+                controls
+                className="w-full h-auto object-contain max-h-[80vh]"
+                preload="metadata"
+                onError={() => {
+                  console.error('Video failed to load:', post.media_urls[0]);
+                }}
+              />
+            </div>
           )}
 
           {post.media_type === 'carousel' && (
-            <div className="relative">
+            <div className="relative w-full max-w-full overflow-hidden bg-gray-100 dark:bg-gray-800">
               <img
                 src={post.media_urls[currentImageIndex]}
                 alt={`${post.title} ${currentImageIndex + 1}`}
-                className="w-full h-64 md:h-80 object-cover"
+                className="w-full h-auto object-contain max-h-[80vh]"
+                style={{
+                  imageRendering: '-webkit-optimize-contrast' as any
+                }}
+                onError={(e) => {
+                  // Fallback to a placeholder image if the original fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.src = 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=800';
+                }}
               />
 
               {post.media_urls.length > 1 && (
                 <>
                   <button
                     onClick={prevImage}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors z-10"
                   >
                     <ChevronLeft size={20} />
                   </button>
                   <button
                     onClick={nextImage}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors z-10"
                   >
                     <ChevronRight size={20} />
                   </button>
 
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2 z-10">
                     {post.media_urls.map((_, index) => (
                       <div
                         key={index}

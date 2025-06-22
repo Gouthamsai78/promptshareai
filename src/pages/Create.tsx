@@ -1,13 +1,19 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, Image, Video, X, Plus, Check } from 'lucide-react';
+import { Image, Video, X, Plus, Check, FileText, Wrench } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
+import { StorageService } from '../services/storage';
 import SmartFileUpload from '../components/SmartFileUpload';
+import ToolSubmissionForm from '../components/ToolSubmissionForm';
+import PageLayout from '../components/PageLayout';
 
 const Create: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const [activeTab, setActiveTab] = useState<'post' | 'tool'>('post');
+  const [showToolForm, setShowToolForm] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -15,7 +21,7 @@ const Create: React.FC = () => {
     prompt: '',
     tags: [] as string[],
     allowCopyPrompt: true,
-    mediaType: 'image' as 'image' | 'video' | 'carousel',
+    mediaType: 'image' as 'image' | 'video' | 'carousel' | 'reel',
     status: 'published' as 'draft' | 'published'
   });
 
@@ -50,25 +56,89 @@ const Create: React.FC = () => {
     }));
   };
 
-  const handleMediaUpload = (urls: string[]) => {
-    setMediaUrls(urls);
-    setError('');
-  };
 
-  const handleUploadError = (error: string) => {
-    setError(error);
-  };
 
-  const handleSmartFileUpload = (files: File[], mediaType: 'image' | 'video' | 'carousel') => {
+  const handleSmartFileUpload = async (files: File[], mediaType: 'image' | 'video' | 'carousel' | 'reel') => {
     setUploadedFiles(files);
     setFormData(prev => ({ ...prev, mediaType }));
     setError('');
+    setIsSubmitting(true);
 
-    // For now, we'll create mock URLs. In a real app, you'd upload to Supabase Storage
-    const mockUrls = files.map((file, index) =>
-      `https://example.com/uploads/${Date.now()}-${index}-${file.name}`
-    );
-    setMediaUrls(mockUrls);
+    try {
+      if (!user) {
+        throw new Error('You must be logged in to upload files');
+      }
+
+      console.log('🔄 Starting file upload process...', {
+        fileCount: files.length,
+        mediaType,
+        isReel: mediaType === 'reel',
+        fileSizes: files.map(f => `${f.name}: ${(f.size / 1024 / 1024).toFixed(2)}MB`),
+        fileTypes: files.map(f => f.type)
+      });
+
+      // Upload files to Supabase Storage
+      const uploadResults = await Promise.all(
+        files.map(async (file) => {
+          try {
+            const result = await StorageService.uploadFile(file, 'media', user.id, 'posts');
+
+            if (result.error) {
+              console.error('Upload error for file:', file.name, result.error);
+              throw new Error(`Failed to upload ${file.name}: ${result.error}`);
+            }
+
+            console.log('✅ File uploaded successfully:', file.name, result.url);
+            return result.url;
+          } catch (error: any) {
+            console.error('Error uploading file:', file.name, error);
+            throw new Error(`Failed to upload ${file.name}: ${error.message}`);
+          }
+        })
+      );
+
+      // Filter out any failed uploads
+      const successfulUrls = uploadResults.filter(url => url && url.length > 0);
+
+      if (successfulUrls.length === 0) {
+        throw new Error('No files were uploaded successfully');
+      }
+
+      if (successfulUrls.length < files.length) {
+        console.warn(`⚠️ Only ${successfulUrls.length} of ${files.length} files uploaded successfully`);
+      }
+
+      setMediaUrls(successfulUrls);
+      console.log('✅ All files uploaded successfully:', successfulUrls);
+
+    } catch (error: any) {
+      console.error('❌ File upload failed:', error);
+
+      // Provide user-friendly error messages
+      let userMessage = 'File upload failed. ';
+
+      if (error.message && error.message.includes('row-level security policy')) {
+        userMessage += 'Please make sure you are logged in and try again. If the problem persists, contact support.';
+      } else if (error.message && error.message.includes('Failed to fetch')) {
+        userMessage += 'Network connection issue. Please check your internet connection and try again.';
+      } else if (error.message && error.message.includes('storage')) {
+        userMessage += 'Storage service is temporarily unavailable. Please try again in a few moments.';
+      } else if (error.message && error.message.includes('size')) {
+        userMessage += 'File size too large. Please use files smaller than 50MB.';
+      } else if (error.message && error.message.includes('type')) {
+        userMessage += 'File type not supported. Please use JPEG, PNG, GIF, WebP, MP4, WebM, or MOV files.';
+      } else {
+        userMessage += error.message || 'An unexpected error occurred.';
+      }
+
+      setError(userMessage);
+
+      // Clear uploaded files on error
+      setUploadedFiles([]);
+      setMediaUrls([]);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const validateForm = () => {
@@ -107,19 +177,38 @@ const Create: React.FC = () => {
     setError('');
 
     try {
-      const postData = {
-        user_id: user.id,
-        title: formData.title.trim(),
-        description: formData.description.trim() || null,
-        prompt: formData.prompt.trim() || null,
-        tags: formData.tags,
-        media_urls: mediaUrls,
-        media_type: mediaUrls.length > 0 ? formData.mediaType : null,
-        allow_copy_prompt: formData.allowCopyPrompt,
-        status: formData.status
-      };
+      // Check if this should be a reel (vertical video)
+      if (formData.mediaType === 'reel' && mediaUrls.length > 0) {
+        console.log('🎬 Creating reel instead of post');
 
-      await DatabaseService.createPost(postData);
+        const reelData = {
+          user_id: user.id,
+          title: formData.title.trim(),
+          video_url: mediaUrls[0], // Reels only have one video
+          prompt: formData.prompt.trim() || null,
+          tags: formData.tags,
+          allow_copy_prompt: formData.allowCopyPrompt,
+        };
+
+        await DatabaseService.createReel(reelData);
+        console.log('✅ Reel created successfully');
+      } else {
+        // Create regular post
+        const postData = {
+          user_id: user.id,
+          title: formData.title.trim(),
+          description: formData.description.trim() || null,
+          prompt: formData.prompt.trim() || null,
+          tags: formData.tags,
+          media_urls: mediaUrls,
+          media_type: mediaUrls.length > 0 ? (formData.mediaType === 'reel' ? 'video' : formData.mediaType) : null,
+          allow_copy_prompt: formData.allowCopyPrompt,
+          status: formData.status
+        };
+
+        await DatabaseService.createPost(postData);
+        console.log('✅ Post created successfully');
+      }
 
       setSuccess(true);
 
@@ -143,8 +232,28 @@ const Create: React.FC = () => {
       }, 2000);
 
     } catch (error: any) {
-      console.error('Error creating post:', error);
-      setError(error.message || 'Failed to create post. Please try again.');
+      console.error('❌ Error creating content:', error);
+
+      // Provide specific error messages for common issues
+      let userMessage = 'Failed to create content. ';
+
+      if (error.message && error.message.includes('Permission denied')) {
+        userMessage += 'Please make sure you are logged in and try again. If the problem persists, try logging out and logging back in.';
+      } else if (error.message && error.message.includes('row-level security policy')) {
+        userMessage += 'There was a permission issue. Please log out and log back in, then try again.';
+      } else if (error.message && error.message.includes('Authentication error')) {
+        userMessage += 'Authentication failed. Please log out and log back in.';
+      } else if (error.message && error.message.includes('User ID mismatch')) {
+        userMessage += 'Session error detected. Please refresh the page and try again.';
+      } else if (error.message && error.message.includes('not-null constraint')) {
+        userMessage += 'Some required information is missing. Please check all fields and try again.';
+      } else if (error.message && error.message.includes('foreign key constraint')) {
+        userMessage += 'User profile issue detected. Please log out and log back in.';
+      } else {
+        userMessage += error.message || 'An unexpected error occurred. Please try again.';
+      }
+
+      setError(userMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -152,44 +261,101 @@ const Create: React.FC = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-20 md:pt-24 pb-20 md:pb-8 flex items-center justify-center">
+      <PageLayout className="flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check size={32} className="text-green-600 dark:text-green-400" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Post Created Successfully!
+            {formData.mediaType === 'reel' ? 'Reel Created Successfully!' : 'Post Created Successfully!'}
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Your post has been published and will appear in the feed.
+            {formData.mediaType === 'reel'
+              ? 'Your reel has been published and will appear in the Reels section.'
+              : 'Your post has been published and will appear in the feed.'
+            }
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-500">
             Redirecting to home...
           </p>
         </div>
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-20 md:pt-24 pb-20 md:pb-8">
+    <PageLayout>
       <div className="max-w-2xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Create New Post
+            Create & Share
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Share your amazing AI prompts with the community
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Share your amazing AI prompts or submit useful AI tools
           </p>
+
+          {/* Step-by-step guidance */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+            <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+              🚀 Quick Start Guide
+            </h3>
+            <div className="grid md:grid-cols-3 gap-4 text-xs text-blue-800 dark:text-blue-200">
+              <div className="flex items-start space-x-2">
+                <span className="flex-shrink-0 w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
+                <div>
+                  <p className="font-medium">Upload Content</p>
+                  <p className="text-blue-700 dark:text-blue-300">Add images, videos, or create text-only posts</p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-2">
+                <span className="flex-shrink-0 w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
+                <div>
+                  <p className="font-medium">Add Details</p>
+                  <p className="text-blue-700 dark:text-blue-300">Write title, description, and your AI prompt</p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-2">
+                <span className="flex-shrink-0 w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
+                <div>
+                  <p className="font-medium">Publish</p>
+                  <p className="text-blue-700 dark:text-blue-300">Share with the community or save as draft</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-red-700 dark:text-red-400">{error}</p>
-          </div>
-        )}
+        {/* Tabs */}
+        <div className="flex space-x-1 mb-8 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+          {[
+            { key: 'post', label: 'Create Post', icon: FileText },
+            { key: 'tool', label: 'Submit Tool', icon: Wrench }
+          ].map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key as typeof activeTab)}
+              className={`flex-1 flex items-center justify-center space-x-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
+                activeTab === key
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              <Icon size={18} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'post' ? (
+          <>
+            {/* Error Message */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-red-700 dark:text-red-400">{error}</p>
+              </div>
+            )}
 
         {/* Smart File Upload - Prominent at the top */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 mb-6">
@@ -201,6 +367,40 @@ const Create: React.FC = () => {
             maxFiles={10}
             maxSizeInMB={50}
           />
+
+          {/* Debug Info */}
+          {uploadedFiles.length > 0 && (
+            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                <strong>Upload Status:</strong>
+              </p>
+              <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                <p>• Files selected: {uploadedFiles.length}</p>
+                <p>• Media URLs generated: {mediaUrls.length}</p>
+                <p>• Content type: <strong>{formData.mediaType}</strong></p>
+                {formData.mediaType === 'reel' && (
+                  <p className="text-purple-700 dark:text-purple-300">
+                    🎬 <strong>REEL DETECTED:</strong> This will be saved to the reels table and appear in /reels
+                  </p>
+                )}
+                {formData.mediaType === 'video' && (
+                  <p className="text-green-700 dark:text-green-300">
+                    📹 <strong>VIDEO POST:</strong> This will be saved as a regular video post
+                  </p>
+                )}
+              </div>
+              {mediaUrls.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mb-1">Generated URLs:</p>
+                  {mediaUrls.map((url, index) => (
+                    <p key={index} className="text-xs text-blue-600 dark:text-blue-400 truncate">
+                      {index + 1}: {url}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Form */}
@@ -216,18 +416,21 @@ const Create: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Title *
+                  <span className="text-xs text-gray-500 dark:text-gray-400 font-normal ml-1">
+                    (Make it descriptive and engaging)
+                  </span>
                 </label>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => handleInputChange('title', e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="Enter a catchy title for your prompt"
+                  placeholder="e.g., 'Perfect Portrait Photography Prompt' or 'Creative Writing Assistant'"
                   required
                   maxLength={100}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {formData.title.length}/100 characters
+                  {formData.title.length}/100 characters • This will be the main headline for your post
                 </p>
               </div>
 
@@ -235,17 +438,20 @@ const Create: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Description
+                  <span className="text-xs text-gray-500 dark:text-gray-400 font-normal ml-1">
+                    (Optional - explain what your prompt achieves)
+                  </span>
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   rows={3}
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="Describe what your prompt does..."
+                  placeholder="e.g., 'Get stunning professional portraits with this detailed prompt that includes lighting, composition, and style instructions...'"
                   maxLength={500}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {formData.description.length}/500 characters
+                  {formData.description.length}/500 characters • Help others understand what your prompt does
                 </p>
               </div>
 
@@ -253,17 +459,20 @@ const Create: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   AI Prompt
+                  <span className="text-xs text-gray-500 dark:text-gray-400 font-normal ml-1">
+                    (The actual prompt text that others can copy and use)
+                  </span>
                 </label>
                 <textarea
                   value={formData.prompt}
                   onChange={(e) => handleInputChange('prompt', e.target.value)}
                   rows={4}
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="Enter your AI prompt here..."
+                  placeholder="e.g., 'Professional headshot portrait of a confident business person, studio lighting, sharp focus, high resolution, modern business attire, neutral background, photo-realistic'"
                   maxLength={2000}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {formData.prompt.length}/2000 characters
+                  {formData.prompt.length}/2000 characters • This is what users will copy to use with AI tools
                 </p>
               </div>
             </div>
@@ -278,17 +487,20 @@ const Create: React.FC = () => {
               <div className="flex items-center space-x-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <div className="flex-shrink-0">
                   {formData.mediaType === 'video' && <Video className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+                  {formData.mediaType === 'reel' && <Video className="w-5 h-5 text-purple-600 dark:text-purple-400" />}
                   {formData.mediaType === 'image' && <Image className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
                   {formData.mediaType === 'carousel' && <Plus className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
                     {formData.mediaType === 'video' && 'Video Post'}
+                    {formData.mediaType === 'reel' && '🎬 Reel (Vertical Video)'}
                     {formData.mediaType === 'image' && 'Image Post'}
                     {formData.mediaType === 'carousel' && 'Carousel Post'}
                   </p>
                   <p className="text-xs text-blue-700 dark:text-blue-300">
                     {uploadedFiles.length} file{uploadedFiles.length > 1 ? 's' : ''} uploaded
+                    {formData.mediaType === 'reel' && ' • Will appear in Reels section'}
                   </p>
                 </div>
               </div>
@@ -312,7 +524,7 @@ const Create: React.FC = () => {
                     type="text"
                     value={currentTag}
                     onChange={(e) => setCurrentTag(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
                     className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                     placeholder="Add a tag..."
                   />
@@ -386,8 +598,41 @@ const Create: React.FC = () => {
             </button>
           </div>
         </form>
+          </>
+        ) : (
+          /* Tool Submission Tab */
+          <div className="text-center py-12">
+            <div className="w-24 h-24 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Wrench size={32} className="text-blue-600 dark:text-blue-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              Submit an AI Tool
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+              Help the community discover amazing AI tools by submitting your favorites or tools you've created.
+            </p>
+            <button
+              onClick={() => setShowToolForm(true)}
+              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium flex items-center space-x-2 mx-auto"
+            >
+              <Plus size={20} />
+              <span>Submit Tool</span>
+            </button>
+          </div>
+        )}
+
+        {/* Tool Submission Form Modal */}
+        <ToolSubmissionForm
+          isOpen={showToolForm}
+          onClose={() => setShowToolForm(false)}
+          onSuccess={() => {
+            setShowToolForm(false);
+            // Optionally redirect to explore page to see tools
+            navigate('/explore');
+          }}
+        />
       </div>
-    </div>
+    </PageLayout>
   );
 };
 

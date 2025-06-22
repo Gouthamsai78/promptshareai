@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 import { Post } from '../types';
 import PostCard from '../components/PostCard';
+import PageLayout from '../components/PageLayout';
 
 const Home: React.FC = () => {
   const { user } = useAuth();
@@ -55,14 +56,14 @@ const Home: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-20 md:pt-24 pb-20 md:pb-8 flex items-center justify-center">
+      <PageLayout className="flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-20 md:pt-24 pb-20 md:pb-8">
+    <PageLayout>
       <div className="max-w-2xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
@@ -128,7 +129,7 @@ const Home: React.FC = () => {
           </div>
         )}
       </div>
-    </div>
+    </PageLayout>
   );
 };
 

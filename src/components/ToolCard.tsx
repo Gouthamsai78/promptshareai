@@ -13,11 +13,16 @@ const ToolCard: React.FC<ToolCardProps> = ({ tool }) => {
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3">
-            {tool.logo ? (
+            {tool.logo_url ? (
               <img
-                src={tool.logo}
+                src={tool.logo_url}
                 alt={`${tool.name} logo`}
                 className="w-12 h-12 rounded-lg object-cover"
+                onError={(e) => {
+                  // Hide the image and show the fallback icon instead
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
               />
             ) : (
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -37,7 +42,7 @@ const ToolCard: React.FC<ToolCardProps> = ({ tool }) => {
           </div>
 
           <a
-            href={tool.websiteUrl}
+            href={tool.website_url}
             target="_blank"
             rel="noopener noreferrer"
             className="p-2 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors group-hover:scale-110 duration-200"
@@ -52,7 +57,7 @@ const ToolCard: React.FC<ToolCardProps> = ({ tool }) => {
         </p>
 
         {/* Tags */}
-        {tool.tags.length > 0 && (
+        {tool.tags && tool.tags.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4">
             {tool.tags.map((tag) => (
               <span
@@ -72,7 +77,7 @@ const ToolCard: React.FC<ToolCardProps> = ({ tool }) => {
             <span>Added by {tool.author.username}</span>
           </div>
           <span className="text-xs text-gray-400 dark:text-gray-500">
-            {new Date(tool.createdAt).toLocaleDateString()}
+            {new Date(tool.created_at).toLocaleDateString()}
           </span>
         </div>
       </div>

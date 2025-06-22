@@ -4,6 +4,7 @@ import PostCard from '../components/PostCard';
 import ToolCard from '../components/ToolCard';
 import { DatabaseService } from '../services/database';
 import { Post, Tool } from '../types';
+import PageLayout from '../components/PageLayout';
 
 const Search: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -84,7 +85,7 @@ const Search: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pt-20 md:pt-24 pb-20 md:pb-8">
+    <PageLayout>
       <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
@@ -320,7 +321,7 @@ const Search: React.FC = () => {
           </div>
         )}
       </div>
-    </div>
+    </PageLayout>
   );
 };
 

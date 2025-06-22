@@ -11,7 +11,7 @@ import Create from './pages/Create';
 import Explore from './pages/Explore';
 import Search from './pages/Search';
 import Profile from './pages/Profile';
-import Settings from './pages/Settings';
+
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import AuthCallback from './pages/AuthCallback';
@@ -137,15 +137,14 @@ const AppRoutes = () => {
           }
         />
         <Route
-          path="/settings"
+          path="/test"
           element={
-            <ProtectedRoute>
-              <OfflineModeIndicator />
-              <Navigation />
-              <Settings />
+            <ProtectedRoute requireAuth={false}>
+              <TestPage />
             </ProtectedRoute>
           }
         />
+
       </Routes>
     </div>
   );

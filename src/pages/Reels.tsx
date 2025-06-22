@@ -19,10 +19,12 @@ const Reels: React.FC = () => {
     setLoading(true);
     setError('');
     try {
+      console.log('🎬 Loading reels from database...');
       const reelsData = await DatabaseService.getReels(20, 0);
+      console.log('✅ Reels loaded:', { count: reelsData.length, reels: reelsData });
       setReels(reelsData);
     } catch (error: any) {
-      console.error('Error loading reels:', error);
+      console.error('❌ Error loading reels:', error);
       setError('Failed to load reels. Please try again.');
     } finally {
       setLoading(false);

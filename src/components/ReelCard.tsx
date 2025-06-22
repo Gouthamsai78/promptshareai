@@ -12,6 +12,7 @@ const ReelCard: React.FC<ReelCardProps> = ({ reel, isVisible }) => {
   const [isSaved, setIsSaved] = useState(reel.isSaved || false);
   const [copied, setCopied] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -25,6 +26,16 @@ const ReelCard: React.FC<ReelCardProps> = ({ reel, isVisible }) => {
       }
     }
   }, [isVisible]);
+
+  // Handle video metadata loading to determine aspect ratio
+  const handleVideoLoadedMetadata = () => {
+    if (videoRef.current) {
+      const video = videoRef.current;
+      const aspectRatio = video.videoWidth / video.videoHeight;
+      setVideoAspectRatio(aspectRatio);
+      console.log('Video dimensions:', video.videoWidth, 'x', video.videoHeight, 'Aspect ratio:', aspectRatio);
+    }
+  };
 
   const handleCopyPrompt = async () => {
     if (reel.prompt && reel.allowCopyPrompt) {
@@ -45,17 +56,45 @@ const ReelCard: React.FC<ReelCardProps> = ({ reel, isVisible }) => {
     }
   };
 
+  // Determine video display style based on aspect ratio
+  const getVideoStyle = () => {
+    if (videoAspectRatio === null) {
+      // Default while loading
+      return "w-full h-full object-cover";
+    }
+
+    // For vertical videos (aspect ratio < 1), use object-contain to show full video
+    // For horizontal videos (aspect ratio > 1), use object-cover to fill screen
+    if (videoAspectRatio < 1) {
+      // Vertical video - show full video, center it
+      return "w-full h-full object-contain";
+    } else {
+      // Horizontal video - crop to fill screen
+      return "w-full h-full object-cover";
+    }
+  };
+
   return (
-    <div className="relative w-full h-screen flex-shrink-0 bg-black overflow-hidden">
+    <div className="relative w-full h-screen flex-shrink-0 bg-black overflow-hidden flex items-center justify-center">
       {/* Video */}
       <video
         ref={videoRef}
-        src={reel.videoUrl}
-        className="w-full h-full object-cover"
+        src={reel.video_url}
+        className={getVideoStyle()}
         loop
         muted
         playsInline
         onClick={togglePlay}
+        onLoadedMetadata={handleVideoLoadedMetadata}
+        onError={() => {
+          console.error('Video failed to load:', reel.video_url);
+        }}
+        style={{
+          maxWidth: '100%',
+          maxHeight: '100%',
+          // Ensure high quality video rendering
+          imageRendering: 'high-quality' as any
+        }}
       />
 
       {/* Play/Pause Overlay */}
@@ -77,7 +116,7 @@ const ReelCard: React.FC<ReelCardProps> = ({ reel, isVisible }) => {
       {/* Author Info - Top Left */}
       <div className="absolute top-16 left-4 flex items-center space-x-3">
         <img
-          src={reel.author.profileImage || `https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100`}
+          src={reel.author.avatar_url || `https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100`}
           alt={reel.author.username}
           className="w-10 h-10 rounded-full object-cover border-2 border-white"
         />

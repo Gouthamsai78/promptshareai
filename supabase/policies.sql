@@ -17,8 +17,11 @@ CREATE POLICY "Published posts are viewable by everyone" ON public.posts
 CREATE POLICY "Users can view their own posts" ON public.posts
     FOR SELECT USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert their own posts" ON public.posts
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Authenticated users can create their own posts" ON public.posts
+    FOR INSERT WITH CHECK (
+        auth.role() = 'authenticated'
+        AND auth.uid() = user_id
+    );
 
 CREATE POLICY "Users can update their own posts" ON public.posts
     FOR UPDATE USING (auth.uid() = user_id);
@@ -30,8 +33,11 @@ CREATE POLICY "Users can delete their own posts" ON public.posts
 CREATE POLICY "Reels are viewable by everyone" ON public.reels
     FOR SELECT USING (true);
 
-CREATE POLICY "Users can insert their own reels" ON public.reels
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Authenticated users can create their own reels" ON public.reels
+    FOR INSERT WITH CHECK (
+        auth.role() = 'authenticated'
+        AND auth.uid() = user_id
+    );
 
 CREATE POLICY "Users can update their own reels" ON public.reels
     FOR UPDATE USING (auth.uid() = user_id);
@@ -104,3 +110,50 @@ CREATE POLICY "System can insert notifications" ON public.notifications
 
 CREATE POLICY "Users can update their own notifications" ON public.notifications
     FOR UPDATE USING (auth.uid() = user_id);
+
+-- Storage bucket policies for media uploads
+-- Media bucket policies (for posts, reels, etc.)
+CREATE POLICY "Anyone can view media files" ON storage.objects
+    FOR SELECT USING (bucket_id = 'media');
+
+CREATE POLICY "Authenticated users can upload media files" ON storage.objects
+    FOR INSERT WITH CHECK (
+        bucket_id = 'media'
+        AND auth.role() = 'authenticated'
+        AND (storage.foldername(name))[1] = auth.uid()::text
+    );
+
+CREATE POLICY "Users can update their own media files" ON storage.objects
+    FOR UPDATE USING (
+        bucket_id = 'media'
+        AND auth.uid()::text = (storage.foldername(name))[1]
+    );
+
+CREATE POLICY "Users can delete their own media files" ON storage.objects
+    FOR DELETE USING (
+        bucket_id = 'media'
+        AND auth.uid()::text = (storage.foldername(name))[1]
+    );
+
+-- Avatar bucket policies (for profile pictures)
+CREATE POLICY "Anyone can view avatar files" ON storage.objects
+    FOR SELECT USING (bucket_id = 'avatars');
+
+CREATE POLICY "Authenticated users can upload avatar files" ON storage.objects
+    FOR INSERT WITH CHECK (
+        bucket_id = 'avatars'
+        AND auth.role() = 'authenticated'
+        AND (storage.foldername(name))[1] = auth.uid()::text
+    );
+
+CREATE POLICY "Users can update their own avatar files" ON storage.objects
+    FOR UPDATE USING (
+        bucket_id = 'avatars'
+        AND auth.uid()::text = (storage.foldername(name))[1]
+    );
+
+CREATE POLICY "Users can delete their own avatar files" ON storage.objects
+    FOR DELETE USING (
+        bucket_id = 'avatars'
+        AND auth.uid()::text = (storage.foldername(name))[1]
+    );

@@ -72,21 +72,88 @@ export class DatabaseService {
   }
 
   static async createPost(post: Tables['posts']['Insert']): Promise<Post> {
-    const { data, error } = await supabase
-      .from('posts')
-      .insert(post)
-      .select(`
-        *,
-        author:profiles(*)
-      `)
-      .single();
+    console.log('📝 DatabaseService.createPost called with data:', {
+      user_id: post.user_id,
+      title: post.title,
+      media_type: post.media_type,
+      status: post.status,
+      hasMediaUrls: !!post.media_urls?.length,
+      mediaUrlsCount: post.media_urls?.length || 0
+    });
 
-    if (error) throw error;
+    // Verify user authentication
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    console.log('🔐 Current auth state:', {
+      isAuthenticated: !!authData.user,
+      userId: authData.user?.id,
+      postUserId: post.user_id,
+      userIdsMatch: authData.user?.id === post.user_id
+    });
 
-    return {
-      ...data,
-      author: data.author as Profile,
-    } as Post;
+    if (authError) {
+      console.error('❌ Auth error:', authError);
+      throw new Error(`Authentication error: ${authError.message}`);
+    }
+
+    if (!authData.user) {
+      console.error('❌ No authenticated user found');
+      throw new Error('User must be authenticated to create posts');
+    }
+
+    if (authData.user.id !== post.user_id) {
+      console.error('❌ User ID mismatch:', {
+        authUserId: authData.user.id,
+        postUserId: post.user_id
+      });
+      throw new Error('User ID mismatch - cannot create post for different user');
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .insert(post)
+        .select(`
+          *,
+          author:profiles(*)
+        `)
+        .single();
+
+      if (error) {
+        console.error('❌ Database error creating post:', {
+          error,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+
+        // Provide user-friendly error messages
+        if (error.message.includes('row-level security policy')) {
+          throw new Error('Permission denied: Unable to create post. Please ensure you are logged in and try again.');
+        } else if (error.message.includes('violates not-null constraint')) {
+          throw new Error('Missing required information. Please fill in all required fields.');
+        } else if (error.message.includes('violates foreign key constraint')) {
+          throw new Error('Invalid user reference. Please log out and log back in.');
+        } else {
+          throw new Error(`Failed to create post: ${error.message}`);
+        }
+      }
+
+      console.log('✅ Post created successfully:', {
+        id: data.id,
+        title: data.title,
+        user_id: data.user_id,
+        created_at: data.created_at
+      });
+
+      return {
+        ...data,
+        author: data.author as Profile,
+      } as Post;
+    } catch (error: any) {
+      console.error('❌ Unexpected error in createPost:', error);
+      throw error;
+    }
   }
 
   static async updatePost(id: string, updates: Tables['posts']['Update']): Promise<Post> {
@@ -142,6 +209,8 @@ export class DatabaseService {
 
   // Reels
   static async getReels(limit: number = 20, offset: number = 0): Promise<Reel[]> {
+    console.log('🔍 DatabaseService.getReels called', { limit, offset });
+
     const { data, error } = await supabase
       .from('reels')
       .select(`
@@ -151,30 +220,103 @@ export class DatabaseService {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error fetching reels from database:', error);
+      throw error;
+    }
 
-    return data.map(reel => ({
+    console.log('✅ Raw reels data from database:', data);
+
+    const reels = data.map(reel => ({
       ...reel,
       author: reel.author as Profile,
     })) as Reel[];
+
+    console.log('✅ Processed reels:', reels);
+    return reels;
   }
 
   static async createReel(reel: Tables['reels']['Insert']): Promise<Reel> {
-    const { data, error } = await supabase
-      .from('reels')
-      .insert(reel)
-      .select(`
-        *,
-        author:profiles(*)
-      `)
-      .single();
+    console.log('🎬 DatabaseService.createReel called with data:', {
+      user_id: reel.user_id,
+      title: reel.title,
+      hasVideoUrl: !!reel.video_url,
+      videoUrl: reel.video_url
+    });
 
-    if (error) throw error;
+    // Verify user authentication
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    console.log('🔐 Current auth state for reel:', {
+      isAuthenticated: !!authData.user,
+      userId: authData.user?.id,
+      reelUserId: reel.user_id,
+      userIdsMatch: authData.user?.id === reel.user_id
+    });
 
-    return {
-      ...data,
-      author: data.author as Profile,
-    } as Reel;
+    if (authError) {
+      console.error('❌ Auth error:', authError);
+      throw new Error(`Authentication error: ${authError.message}`);
+    }
+
+    if (!authData.user) {
+      console.error('❌ No authenticated user found');
+      throw new Error('User must be authenticated to create reels');
+    }
+
+    if (authData.user.id !== reel.user_id) {
+      console.error('❌ User ID mismatch:', {
+        authUserId: authData.user.id,
+        reelUserId: reel.user_id
+      });
+      throw new Error('User ID mismatch - cannot create reel for different user');
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('reels')
+        .insert(reel)
+        .select(`
+          *,
+          author:profiles(*)
+        `)
+        .single();
+
+      if (error) {
+        console.error('❌ Database error creating reel:', {
+          error,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+
+        // Provide user-friendly error messages
+        if (error.message.includes('row-level security policy')) {
+          throw new Error('Permission denied: Unable to create reel. Please ensure you are logged in and try again.');
+        } else if (error.message.includes('violates not-null constraint')) {
+          throw new Error('Missing required information. Please fill in all required fields.');
+        } else if (error.message.includes('violates foreign key constraint')) {
+          throw new Error('Invalid user reference. Please log out and log back in.');
+        } else {
+          throw new Error(`Failed to create reel: ${error.message}`);
+        }
+      }
+
+      console.log('✅ Reel created successfully:', {
+        id: data.id,
+        title: data.title,
+        user_id: data.user_id,
+        created_at: data.created_at
+      });
+
+      return {
+        ...data,
+        author: data.author as Profile,
+      } as Reel;
+    } catch (error: any) {
+      console.error('❌ Unexpected error in createReel:', error);
+      throw error;
+    }
   }
 
   static async updateReelViews(id: string): Promise<void> {

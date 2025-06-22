@@ -23,12 +23,14 @@ export class StorageService {
       const folderPath = folder ? `${folder}/` : '';
       const filePath = `${userId}/${folderPath}${fileName}`;
 
-      // Upload file
+      // Upload file with original quality preserved
       const { data, error } = await supabase.storage
         .from(bucket)
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false,
+          // Ensure no automatic compression or transformation
+          contentType: file.type,
         });
 
       if (error) {

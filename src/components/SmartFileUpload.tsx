@@ -7,7 +7,7 @@ interface FileWithPreview extends File {
 }
 
 interface SmartFileUploadProps {
-  onFilesSelected: (files: FileWithPreview[], mediaType: 'image' | 'video' | 'carousel') => void;
+  onFilesSelected: (files: FileWithPreview[], mediaType: 'image' | 'video' | 'carousel' | 'reel') => void;
   maxFiles?: number;
   maxSizeInMB?: number;
   className?: string;
@@ -23,9 +23,10 @@ const SmartFileUpload: React.FC<SmartFileUploadProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [mediaTypeLabel, setMediaTypeLabel] = useState('Image Post');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const detectMediaType = async (files: FileWithPreview[]): Promise<'image' | 'video' | 'carousel'> => {
+  const detectMediaType = async (files: FileWithPreview[]): Promise<'image' | 'video' | 'carousel' | 'reel'> => {
     if (files.length === 0) return 'image';
 
     const hasVideo = files.some(file => file.type.startsWith('video/'));
@@ -37,7 +38,12 @@ const SmartFileUpload: React.FC<SmartFileUploadProps> = ({
       if (videoFile) {
         try {
           const isVertical = await checkIfVideoIsVertical(videoFile);
-          return isVertical ? 'video' : 'video'; // Both return 'video' but we can add logic later for reels
+          console.log('🎬 Video orientation detected:', {
+            fileName: videoFile.name,
+            isVertical,
+            mediaType: isVertical ? 'reel' : 'video'
+          });
+          return isVertical ? 'reel' : 'video'; // Vertical videos become reels
         } catch (error) {
           console.error('Error checking video orientation:', error);
         }
@@ -51,12 +57,33 @@ const SmartFileUpload: React.FC<SmartFileUploadProps> = ({
   const checkIfVideoIsVertical = (file: File): Promise<boolean> => {
     return new Promise((resolve) => {
       const video = document.createElement('video');
+
       video.onloadedmetadata = () => {
-        const isVertical = video.videoHeight > video.videoWidth;
+        const width = video.videoWidth;
+        const height = video.videoHeight;
+        const isVertical = height > width;
+
+        console.log('🎬 Video dimensions detected:', {
+          fileName: file.name,
+          width,
+          height,
+          aspectRatio: width / height,
+          isVertical,
+          classification: isVertical ? 'REEL' : 'VIDEO'
+        });
+
+        URL.revokeObjectURL(video.src);
         resolve(isVertical);
       };
-      video.onerror = () => resolve(false);
+
+      video.onerror = (error) => {
+        console.error('❌ Error loading video metadata:', error);
+        URL.revokeObjectURL(video.src);
+        resolve(false); // Default to horizontal if we can't determine
+      };
+
       video.src = URL.createObjectURL(file);
+      video.load(); // Explicitly load the video
     });
   };
 
@@ -151,6 +178,9 @@ const SmartFileUpload: React.FC<SmartFileUploadProps> = ({
       // Auto-detect media type and notify parent
       const mediaType = await detectMediaType(updatedFiles);
       onFilesSelected(updatedFiles, mediaType);
+
+      // Update label
+      await updateMediaTypeLabel(updatedFiles);
     }
 
     setIsProcessing(false);
@@ -190,8 +220,10 @@ const SmartFileUpload: React.FC<SmartFileUploadProps> = ({
     if (updatedFiles.length > 0) {
       const mediaType = await detectMediaType(updatedFiles);
       onFilesSelected(updatedFiles, mediaType);
+      await updateMediaTypeLabel(updatedFiles);
     } else {
       onFilesSelected([], 'image');
+      setMediaTypeLabel('Image Post');
     }
   };
 
@@ -205,17 +237,48 @@ const SmartFileUpload: React.FC<SmartFileUploadProps> = ({
     return <FileText className="w-4 h-4" />;
   };
 
-  const getMediaTypeLabel = () => {
-    const hasVideo = files.some(file => file.type.startsWith('video/'));
-    const hasImage = files.some(file => file.type.startsWith('image/'));
+  const updateMediaTypeLabel = async (fileList: FileWithPreview[]) => {
+    const hasVideo = fileList.some(file => file.type.startsWith('video/'));
+    const hasImage = fileList.some(file => file.type.startsWith('image/'));
 
-    if (hasVideo && files.length === 1) return 'Video Post';
-    if (hasImage && files.length > 1) return 'Carousel Post';
-    return 'Image Post';
+    if (hasVideo && fileList.length === 1) {
+      const videoFile = fileList.find(file => file.type.startsWith('video/'));
+      if (videoFile) {
+        try {
+          const isVertical = await checkIfVideoIsVertical(videoFile);
+          setMediaTypeLabel(isVertical ? 'Reel (Vertical Video)' : 'Video Post');
+          return;
+        } catch (error) {
+          setMediaTypeLabel('Video Post');
+          return;
+        }
+      }
+      setMediaTypeLabel('Video Post');
+      return;
+    }
+    if (hasImage && fileList.length > 1) {
+      setMediaTypeLabel('Carousel Post');
+      return;
+    }
+    setMediaTypeLabel('Image Post');
   };
 
   return (
     <div className={`w-full ${className}`}>
+      {/* User Guidance Section */}
+      <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+          📋 Upload Guidelines
+        </h4>
+        <div className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
+          <p>• <strong>Images:</strong> JPG, PNG, WebP, GIF (up to {maxSizeInMB}MB each)</p>
+          <p>• <strong>Videos:</strong> MP4, WebM, MOV (up to {maxSizeInMB}MB each)</p>
+          <p>• <strong>Vertical videos</strong> will automatically become Reels</p>
+          <p>• <strong>Multiple images</strong> will create a carousel post</p>
+          <p>• <strong>Original quality</strong> is preserved - no compression</p>
+        </div>
+      </div>
+
       {/* Upload Area */}
       <div
         onDrop={handleDrop}
@@ -273,7 +336,7 @@ const SmartFileUpload: React.FC<SmartFileUploadProps> = ({
         <div className="mt-6">
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-              {getMediaTypeLabel()} ({files.length} file{files.length > 1 ? 's' : ''})
+              {mediaTypeLabel} ({files.length} file{files.length > 1 ? 's' : ''})
             </h4>
             <button
               onClick={() => {

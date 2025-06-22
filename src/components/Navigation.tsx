@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Video, Plus, Search, User, Moon, Sun, Compass, Settings } from 'lucide-react';
+import { Home, Video, Plus, Search, User, Moon, Sun, Compass } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 
 const Navigation: React.FC = () => {
@@ -19,7 +19,7 @@ const Navigation: React.FC = () => {
     { path: '/search', icon: Search, label: 'Search' },
     { path: '/create', icon: Plus, label: 'Create' },
     { path: '/reels', icon: Video, label: 'Reels' },
-    { path: '/settings', icon: Settings, label: 'Settings' }
+    { path: '/profile', icon: User, label: 'Profile' }
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -27,8 +27,8 @@ const Navigation: React.FC = () => {
   return (
     <>
       {/* Desktop Navigation */}
-      <nav className="hidden md:flex fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between w-full">
+      <nav className="hidden md:flex fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700 h-16">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between w-full">
           <Link to="/" className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">AI</span>
@@ -87,8 +87,8 @@ const Navigation: React.FC = () => {
       </nav>
 
       {/* Mobile Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-around px-2 py-3">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg border-t border-gray-200 dark:border-gray-700 h-16">
+        <div className="flex items-center justify-around px-2 py-2 h-full">
           {mobileNavItems.map(({ path, icon: Icon, label }) => (
             <Link
               key={path}
