@@ -8,15 +8,11 @@
   ],
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "source": "/api/:match*",
+      "destination": "/api/:match*"
     },
     {
-      "source": "/(.*\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|webp|mp4|webm|mov))",
-      "destination": "/$1"
-    },
-    {
-      "source": "/((?!api|_next|static|favicon.ico).*)",
+      "source": "/:all*",
       "destination": "/index.html"
     }
   ],
