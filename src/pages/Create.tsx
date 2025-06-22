@@ -13,7 +13,6 @@ const Create: React.FC = () => {
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<'post' | 'tool'>('post');
-  const [showToolForm, setShowToolForm] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -601,36 +600,18 @@ const Create: React.FC = () => {
           </>
         ) : (
           /* Tool Submission Tab */
-          <div className="text-center py-12">
-            <div className="w-24 h-24 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Wrench size={32} className="text-blue-600 dark:text-blue-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Submit an AI Tool
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-              Help the community discover amazing AI tools by submitting your favorites or tools you've created.
-            </p>
-            <button
-              onClick={() => setShowToolForm(true)}
-              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium flex items-center space-x-2 mx-auto"
-            >
-              <Plus size={20} />
-              <span>Submit Tool</span>
-            </button>
-          </div>
+          <ToolSubmissionForm
+            isOpen={true}
+            onClose={() => setActiveTab('post')}
+            onSuccess={() => {
+              setActiveTab('post');
+              navigate('/explore');
+            }}
+            inline={true}
+          />
         )}
 
-        {/* Tool Submission Form Modal */}
-        <ToolSubmissionForm
-          isOpen={showToolForm}
-          onClose={() => setShowToolForm(false)}
-          onSuccess={() => {
-            setShowToolForm(false);
-            // Optionally redirect to explore page to see tools
-            navigate('/explore');
-          }}
-        />
+
       </div>
     </PageLayout>
   );

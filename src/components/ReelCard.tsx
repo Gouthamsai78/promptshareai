@@ -256,10 +256,183 @@ const ReelCard: React.FC<ReelCardProps> = ({ reel, isVisible, isInFeed = false }
     return baseStyle;
   };
 
+  // Feed mode - PostCard-style layout
+  if (isInFeed) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 dark:border-gray-700">
+        {/* Header */}
+        <div className="p-4 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => navigate(`/user/${reel.author.username}`)}
+              className="flex-shrink-0 hover:opacity-80 transition-opacity"
+            >
+              <img
+                src={reel.author.avatar_url || `https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100`}
+                alt={reel.author.username}
+                className="w-10 h-10 rounded-full object-cover"
+              />
+            </button>
+            <div>
+              <div className="flex items-center space-x-1">
+                <button
+                  onClick={() => navigate(`/user/${reel.author.username}`)}
+                  className="font-semibold text-gray-900 dark:text-white hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                >
+                  {reel.author.full_name || reel.author.username}
+                </button>
+                {reel.author.verified && (
+                  <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <Check size={10} className="text-white" />
+                  </div>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                <button
+                  onClick={() => navigate(`/user/${reel.author.username}`)}
+                  className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                >
+                  @{reel.author.username}
+                </button>
+                <span> • {new Date(reel.created_at).toLocaleDateString()}</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="px-2 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-full">
+              🎬 Reel
+            </span>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="px-4 pb-3">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+            {reel.title}
+          </h2>
+        </div>
+
+        {/* Video */}
+        <div className="relative cursor-pointer" onClick={handleReelClick}>
+          <video
+            ref={videoRef}
+            src={reel.video_url}
+            className="w-full h-80 object-cover"
+            loop
+            muted
+            playsInline
+            onLoadedMetadata={handleVideoLoadedMetadata}
+            onError={() => {
+              console.error('Video failed to load:', reel.video_url);
+            }}
+          />
+          <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+            <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+              <Play size={24} className="text-white ml-1" />
+            </div>
+          </div>
+          <div className="absolute top-3 right-3">
+            <span className="px-2 py-1 text-xs font-medium bg-black/60 text-white rounded-full">
+              {Math.floor(viewsCount / 1000)}K views
+            </span>
+          </div>
+        </div>
+
+        {/* Prompt */}
+        {reel.prompt && (
+          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 mx-4 mt-4 rounded-lg">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-700 dark:text-gray-300 flex-1 pr-3">
+                {reel.prompt}
+              </p>
+              {reel.allow_copy_prompt && (
+                <button
+                  onClick={handleCopyPrompt}
+                  className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                    copied
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                      : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50'
+                  }`}
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                  <span>{copied ? 'Copied!' : 'Copy'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tags */}
+        {reel.tags && reel.tags.length > 0 && (
+          <div className="px-4 mt-3">
+            <div className="flex flex-wrap gap-2">
+              {reel.tags.map((tag, index) => (
+                <span
+                  key={index}
+                  className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="p-4 flex items-center justify-between">
+          <div className="flex items-center space-x-6">
+            <button
+              onClick={handleLike}
+              disabled={loading}
+              className={`flex items-center space-x-2 transition-colors disabled:opacity-50 ${
+                isLiked ? 'text-red-500' : 'text-gray-600 dark:text-gray-400 hover:text-red-500'
+              }`}
+            >
+              <Heart size={20} fill={isLiked ? 'currentColor' : 'none'} />
+              <span className="text-sm font-medium">{likesCount}</span>
+            </button>
+
+            <button
+              onClick={() => setShowComments(!showComments)}
+              className="flex items-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-blue-500 transition-colors"
+            >
+              <MessageCircle size={20} />
+              <span className="text-sm font-medium">{reel.comments_count}</span>
+            </button>
+
+            <button
+              className="flex items-center space-x-2 text-gray-600 dark:text-gray-400"
+            >
+              <Eye size={20} />
+              <span className="text-sm font-medium">{viewsCount}</span>
+            </button>
+          </div>
+
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className={`transition-colors disabled:opacity-50 ${
+              isSaved ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400 hover:text-blue-500'
+            }`}
+          >
+            <Bookmark size={20} fill={isSaved ? 'currentColor' : 'none'} />
+          </button>
+        </div>
+
+        {/* Comments Section */}
+        {showComments && (
+          <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+            <Comments reelId={reel.id} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Full-screen mode - original TikTok-style layout
   return (
     <div
-      className={`relative w-full ${isInFeed ? 'h-96' : 'h-screen'} flex-shrink-0 bg-black overflow-hidden flex items-center justify-center`}
-      onClick={isInFeed ? handleReelClick : undefined}
+      className="relative w-full h-screen flex-shrink-0 bg-black overflow-hidden flex items-center justify-center"
     >
       {/* Video */}
       <video
@@ -463,49 +636,27 @@ const ReelCard: React.FC<ReelCardProps> = ({ reel, isVisible, isInFeed = false }
         </div>
       )}
 
-      {/* Feed Mode Content */}
-      {isInFeed && (
-        <div className="absolute bottom-4 left-4 right-4">
-          <div className="bg-black/60 backdrop-blur-sm rounded-lg p-3">
-            <div className="flex items-center space-x-2 mb-2">
-              <img
-                src={reel.author.avatar_url || `https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100`}
-                alt={reel.author.username}
-                className="w-6 h-6 rounded-full object-cover"
-              />
-              <span className="text-white font-medium text-sm">{reel.author.username}</span>
-              {reel.author.verified && (
-                <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
-                  <Check size={8} className="text-white" />
-                </div>
-              )}
-            </div>
-            <h3 className="text-white font-semibold text-sm line-clamp-2">
-              {reel.title}
-            </h3>
-          </div>
-        </div>
-      )}
+
 
       {/* Comments Modal/Overlay */}
       {showComments && !isInFeed && (
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end">
-          <div className="w-full bg-white dark:bg-gray-900 rounded-t-2xl max-h-[80vh] overflow-hidden shadow-2xl">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-800">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end">
+          <div className="w-full bg-white dark:bg-gray-900 rounded-t-2xl max-h-[50vh] overflow-hidden shadow-2xl">
+            <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-800">
               <div className="flex items-center space-x-2">
-                <MessageCircle size={20} className="text-gray-600 dark:text-gray-400" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <MessageCircle size={18} className="text-gray-600 dark:text-gray-400" />
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                   Comments ({reel.comments_count})
                 </h3>
               </div>
               <button
                 onClick={() => setShowComments(false)}
-                className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
+                className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
               >
-                <X size={20} className="text-gray-500 dark:text-gray-400" />
+                <X size={18} className="text-gray-500 dark:text-gray-400" />
               </button>
             </div>
-            <div className="overflow-y-auto max-h-[calc(80vh-80px)] bg-white dark:bg-gray-900">
+            <div className="overflow-y-auto max-h-[calc(50vh-60px)] bg-white dark:bg-gray-900">
               <Comments reelId={reel.id} />
             </div>
           </div>

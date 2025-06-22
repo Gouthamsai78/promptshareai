@@ -109,9 +109,7 @@ const Home: React.FC = () => {
               item.type === 'post' ? (
                 <PostCard key={`post-${item.id}`} post={item} />
               ) : (
-                <div key={`reel-${item.id}`} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
-                  <ReelCard reel={item} isVisible={false} isInFeed={true} />
-                </div>
+                <ReelCard key={`reel-${item.id}`} reel={item} isVisible={false} isInFeed={true} />
               )
             ))}
           </div>
